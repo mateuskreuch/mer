@@ -1,5 +1,5 @@
 import yaml
-from process import Process
+from .process import Process
 
 YML_PATH = 'processes.yml'
 

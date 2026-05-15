@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mer"
+version = "0.1.0"
+description = "A TUI process manager"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "Mateus A. Kreuch" }
+]
+dependencies = [
+    "textual>=0.85.2",
+    "rich>=13.7.1",
+    "pyyaml>=6.0.1",
+]
+
+[project.scripts]
+mer = "mer.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mer*"]

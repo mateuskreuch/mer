@@ -1,5 +1,5 @@
 from rich.text import Text
-from textual.app import App, ComposeResult
+from textual.app import App
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.css.query import NoMatches
@@ -18,9 +18,9 @@ from textual.widgets import (
 from textual.message import Message
 from textual.screen import ModalScreen
 
-from color import get_unique_color
-from process import ON_WINDOWS
-from process_manager import ProcessManager
+from .color import get_unique_color
+from .process import ON_WINDOWS
+from .process_manager import ProcessManager
 
 class RunCommandScreen(ModalScreen):
    def __init__(self, process_name: str, cwd: str, **kwargs):
