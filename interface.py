@@ -27,7 +27,7 @@ class SetPinnedLogs(Message):
       super().__init__()
 
 class ProcessLogs(Widget):
-   selected_process = reactive[str | None](None)
+   highlighted_process = reactive[str | None](None)
 
    def __init__(self, **kwargs) -> None:
       super().__init__(**kwargs)
@@ -38,7 +38,7 @@ class ProcessLogs(Widget):
       yield Static("", id="log-header")
       yield RichLog(id="log-view", highlight=True, markup=False)
 
-   def watch_selected_process(self, value: str | None) -> None:
+   def watch_highlighted_process(self, value: str | None) -> None:
       self._rebuild_logs()
 
    def set_pinned(self, process_name: str, pinned: bool) -> None:
@@ -50,7 +50,7 @@ class ProcessLogs(Widget):
       self._rebuild_logs()
 
    def get_all_log_sources(self) -> set[str]:
-      return self._pinned_processes | ({self.selected_process} if self.selected_process else set())
+      return self._pinned_processes | ({self.highlighted_process} if self.highlighted_process else set())
 
    def add_log_line(self, process_name: str, text: str) -> None:
       if process_name in self.get_all_log_sources():
@@ -183,7 +183,7 @@ class MerApp(App):
 
       with Horizontal():
          yield ProcessListView(
-            *[ProcessItem(name, id=f"process-item-{name}") for name, p in ProcessManager().processes.items()],
+            *[ProcessItem(name, id=f"process-item-{name}") for name in ProcessManager().processes],
             id="sidebar",
          )
          with Vertical():
@@ -204,7 +204,7 @@ class MerApp(App):
       if not isinstance(event.item, ProcessItem):
          return
 
-      self.query_one(ProcessLogs).selected_process = event.item._process_name
+      self.query_one(ProcessLogs).highlighted_process = event.item.process_name
 
    def on_set_pinned_logs(self, message: SetPinnedLogs) -> None:
       self.query_one(ProcessLogs).set_pinned(message.name, message.pinned)
