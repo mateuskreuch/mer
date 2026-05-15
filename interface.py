@@ -157,32 +157,17 @@ class MerApp(App):
    #log-view {
       height: 1fr;
    }
-   #sidebar {
-      width: 26;
-      border-right: solid $primary-darken-2;
-   }
    #log-header {
       height: 1;
       background: $primary-darken-2;
       padding: 0 1;
    }
-   TabbedContent {
-      height: 1fr;
+   #sidebar {
+      width: 26;
+      border-right: solid $primary-darken-2;
    }
    ProcessItem {
       padding: 0 1;
-   }
-   #stats-input-row {
-      height: auto;
-      border-top: solid $primary-darken-2;
-   }
-   #stats-prompt {
-      height: 1;
-      padding: 0 1;
-      color: $success;
-   }
-   #stats-input {
-      border: none;
    }
    """
 
