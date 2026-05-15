@@ -1,0 +1,10 @@
+clock:
+  run: python -c "import time; [print(f'tick {i}', flush=True) or time.sleep(1) for i in range(9999)]"
+
+worker:
+  needs: [clock]
+  run: ping -t localhost
+
+worker2:
+  needs: [clock]
+  run: ping -t localhost
