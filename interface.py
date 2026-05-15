@@ -20,7 +20,7 @@ from color import get_unique_color
 from process_manager import ProcessManager
 
 class SetPinnedLogs(Message):
-   def __init__(self, name: str, pinned: bool) -> None:
+   def __init__(self, name: str, pinned: bool):
       self.name = name
       self.pinned = pinned
 
@@ -29,19 +29,19 @@ class SetPinnedLogs(Message):
 class ProcessLogs(Widget):
    highlighted_process = reactive[str | None](None)
 
-   def __init__(self, **kwargs) -> None:
+   def __init__(self, **kwargs):
       super().__init__(**kwargs)
 
       self._pinned_processes: set[str] = set()
 
-   def compose(self) -> ComposeResult:
+   def compose(self):
       yield Static("", id="log-header")
       yield RichLog(id="log-view", highlight=True, markup=False)
 
-   def watch_highlighted_process(self, value: str | None) -> None:
+   def watch_highlighted_process(self, value):
       self._rebuild_logs()
 
-   def set_pinned(self, process_name: str, pinned: bool) -> None:
+   def set_pinned(self, process_name: str, pinned: bool):
       if pinned:
          self._pinned_processes.add(process_name)
       else:
@@ -52,11 +52,11 @@ class ProcessLogs(Widget):
    def get_all_log_sources(self) -> set[str]:
       return self._pinned_processes | ({self.highlighted_process} if self.highlighted_process else set())
 
-   def add_log_line(self, process_name: str, text: str) -> None:
+   def add_log_line(self, process_name: str, text: str):
       if process_name in self.get_all_log_sources():
          self._write_log(process_name, text)
 
-   def _rebuild_logs(self) -> None:
+   def _rebuild_logs(self):
       log_sources = self.get_all_log_sources()
 
       self.query_one("#log-header", Static).update(", ".join(sorted(log_sources)))
@@ -78,7 +78,7 @@ class ProcessLogs(Widget):
       for _, name, line in all_logs:
          self._write_log(name, line)
 
-   def _write_log(self, process_name: str, line: str) -> None:
+   def _write_log(self, process_name: str, line: str):
       log_view = self.query_one("#log-view", RichLog)
       text = Text()
       color = get_unique_color(process_name)
@@ -90,7 +90,7 @@ class ProcessItem(ListItem):
    logs_pinned = reactive[bool](False)
    process_running = reactive[bool](False)
 
-   def __init__(self, process_name: str, **kwargs) -> None:
+   def __init__(self, process_name: str, **kwargs):
       super().__init__(**kwargs)
 
       self._process_name = process_name
@@ -99,22 +99,22 @@ class ProcessItem(ListItem):
    def process_name(self):
       return self._process_name
 
-   def compose(self) -> ComposeResult:
+   def compose(self):
       yield Label(self._label())
 
-   def watch_logs_pinned(self, value: bool) -> None:
+   def watch_logs_pinned(self, value):
       self._refresh_label()
 
-   def watch_process_running(self, value: bool) -> None:
+   def watch_process_running(self, value):
       self._refresh_label()
 
-   def _refresh_label(self) -> None:
+   def _refresh_label(self):
       try:
          self.query_one(Label).update(self._label())
       except NoMatches:
          pass
 
-   def _label(self) -> Text:
+   def _label(self):
       text = Text()
 
       if self.logs_pinned:
@@ -137,10 +137,10 @@ class ProcessListView(ListView):
       Binding("space", "toggle_pinned", "Pin logs"),
    ]
 
-   async def action_select_cursor(self) -> None:
+   async def action_select_cursor(self):
       await ProcessManager().toggle(self.highlighted_child.process_name)
 
-   def action_toggle_pinned(self) -> None:
+   def action_toggle_pinned(self):
       highlighted = self.highlighted_child
 
       highlighted.logs_pinned = not highlighted.logs_pinned
@@ -175,10 +175,10 @@ class MerApp(App):
       Binding("q", "quit", "Quit"),
    ]
 
-   def __init__(self) -> None:
+   def __init__(self):
       super().__init__()
 
-   def compose(self) -> ComposeResult:
+   def compose(self):
       yield Header()
 
       with Horizontal():
@@ -191,7 +191,7 @@ class MerApp(App):
 
       yield Footer()
 
-   def on_mount(self) -> None:
+   def on_mount(self):
       def on_log(name, ts, text):
          self.query_one(ProcessLogs).add_log_line(name, text)
 
@@ -200,11 +200,11 @@ class MerApp(App):
 
       ProcessManager().set_callbacks(on_log, on_state_change)
 
-   def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
+   def on_list_view_highlighted(self, event: ListView.Highlighted):
       if not isinstance(event.item, ProcessItem):
          return
 
       self.query_one(ProcessLogs).highlighted_process = event.item.process_name
 
-   def on_set_pinned_logs(self, message: SetPinnedLogs) -> None:
+   def on_set_pinned_logs(self, message: SetPinnedLogs):
       self.query_one(ProcessLogs).set_pinned(message.name, message.pinned)

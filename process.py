@@ -31,10 +31,6 @@ class Process:
       self._on_log = None
       self._on_state_change = None
 
-   def set_callbacks(self, on_log, on_state_change):
-      self._on_log = on_log
-      self._on_state_change = on_state_change
-
    @property
    def name(self):
       return self._name
@@ -55,8 +51,12 @@ class Process:
          self._on_state_change(self._name, value)
 
    @property
-   def logs(self) -> list[tuple[float, str]]:
+   def logs(self):
       return self._logs
+
+   def set_callbacks(self, on_log, on_state_change):
+      self._on_log = on_log
+      self._on_state_change = on_state_change
 
    async def start(self):
       try:
@@ -104,7 +104,7 @@ class Process:
       def kill(self):
          self.terminate(signal.SIGKILL)
 
-   async def _stream_output(self) -> None:
+   async def _stream_output(self):
       try:
          while True:
             line = await self._process.stdout.readline()
@@ -120,7 +120,7 @@ class Process:
       finally:
          self.is_running = False
 
-   def _add_log(self, timestamp: float, text: str) -> None:
+   def _add_log(self, timestamp, text):
       self._logs.append((timestamp, text))
 
       if self._on_log:

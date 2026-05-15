@@ -3,8 +3,8 @@ from process import Process
 
 YML_PATH = 'processes.yml'
 
-def load_yml() -> dict[str, Process]:
-   with open(YML_PATH, "r", encoding="utf-8") as f:
+def load_yml(path: str) -> dict[str, Process]:
+   with open(path, "r", encoding="utf-8") as f:
       data = yaml.safe_load(f)
 
    return {
@@ -28,7 +28,7 @@ class SingletonMeta(type):
 
 class ProcessManager(metaclass=SingletonMeta):
    def __init__(self, processes: dict[str, Process] = None):
-      self._processes = processes or load_yml()
+      self._processes = processes or load_yml(YML_PATH)
       self._dependency_order: dict[str, list[str]] = {}
       self._on_log = None
       self._on_state_change = None
@@ -44,13 +44,13 @@ class ProcessManager(metaclass=SingletonMeta):
    def processes(self):
       return self._processes
 
-   async def toggle(self, name):
+   async def toggle(self, name: str):
       if self._processes[name].is_running:
          self.stop(name)
       else:
          await self.start(name)
 
-   async def start(self, name):
+   async def start(self, name: str):
       if name not in self._dependency_order:
          self._dependency_order[name] = self._get_dependency_order(name)
 
@@ -60,7 +60,7 @@ class ProcessManager(metaclass=SingletonMeta):
          if not process.is_running:
             await process.start()
 
-   def stop(self, name):
+   def stop(self, name: str):
       self._processes[name].terminate()
 
    def _get_dependency_order(self, name: str) -> list[str]:
