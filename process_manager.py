@@ -17,10 +17,28 @@ def load_yml() -> dict[str, Process]:
       for name, config in data.items()
    }
 
-class ProcessManager:
-   def __init__(self, processes: dict[str, Process]):
-      self._processes = processes
+class SingletonMeta(type):
+   _instances = {}
+
+   def __call__(cls, *args, **kwargs):
+      if cls not in cls._instances:
+         cls._instances[cls] = super().__call__(*args, **kwargs)
+
+      return cls._instances[cls]
+
+class ProcessManager(metaclass=SingletonMeta):
+   def __init__(self, processes: dict[str, Process] = None):
+      self._processes = processes or load_yml()
       self._dependency_order: dict[str, list[str]] = {}
+      self._on_log = None
+      self._on_state_change = None
+
+   def set_callbacks(self, on_log, on_state_change):
+      self._on_log = on_log
+      self._on_state_change = on_state_change
+
+      for process in self._processes.values():
+         process.set_callbacks(self._on_log, self._on_state_change)
 
    @property
    def processes(self):

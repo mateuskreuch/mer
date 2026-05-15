@@ -28,6 +28,12 @@ class Process:
       self._needs = needs
       self._running = False
       self._logs: list[tuple[float, str]] = []
+      self._on_log = None
+      self._on_state_change = None
+
+   def set_callbacks(self, on_log, on_state_change):
+      self._on_log = on_log
+      self._on_state_change = on_state_change
 
    @property
    def name(self):
@@ -40,6 +46,13 @@ class Process:
    @property
    def is_running(self):
       return self._running
+
+   @is_running.setter
+   def is_running(self, value):
+      self._running = value
+
+      if self._on_state_change:
+         self._on_state_change(self._name, value)
 
    @property
    def logs(self) -> list[tuple[float, str]]:
@@ -56,7 +69,8 @@ class Process:
                close_fds=not ON_WINDOWS,
                **_compat_kwargs()
          )
-         self._running = True
+         self.is_running = True
+
          asyncio.ensure_future(self._stream_output())
 
       except:
@@ -68,7 +82,8 @@ class Process:
             subprocess.call(
                ['taskkill', '/F', '/T', '/PID', str(self._process.pid)],
                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            self._running = False
+
+            self.is_running = False
 
          except:
             pass
@@ -76,7 +91,8 @@ class Process:
       def terminate(self, sig = signal.SIGTERM):
          try:
             os.killpg(self._process.pid, sig)
-            self._running = False
+
+            self.is_running = False
 
          except:
             pass
@@ -92,8 +108,20 @@ class Process:
       try:
          while True:
             line = await self._process.stdout.readline()
+
             if not line:
                break
-            self._logs.append((time.time_ns(), line.decode(errors="replace").rstrip("\r\n")))
+
+            ts = time.time_ns()
+            text = line.decode(errors="replace").rstrip("\r\n")
+
+            self._add_log(ts, text)
+
       finally:
-         self._running = False
+         self.is_running = False
+
+   def _add_log(self, timestamp: float, text: str) -> None:
+      self._logs.append((timestamp, text))
+
+      if self._on_log:
+         self._on_log(self._name, timestamp, text)

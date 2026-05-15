@@ -2,6 +2,7 @@ from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
+from textual.css.query import NoMatches
 from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import (
@@ -13,31 +14,35 @@ from textual.widgets import (
    RichLog,
    Static,
 )
+from textual.message import Message
 
 from color import get_unique_color
-from process import Process
-from process_manager import ProcessManager, load_yml
+from process_manager import ProcessManager
+
+class SetPinnedLogs(Message):
+   def __init__(self, name: str, pinned: bool) -> None:
+      self.name = name
+      self.pinned = pinned
+
+      super().__init__()
 
 class ProcessLogs(Widget):
    selected_process = reactive[str | None](None)
 
    def __init__(self, **kwargs) -> None:
       super().__init__(**kwargs)
+
       self._pinned_processes: set[str] = set()
-      self._logged_lines: dict[str, int] = {}
 
    def compose(self) -> ComposeResult:
       yield Static("", id="log-header")
       yield RichLog(id="log-view", highlight=True, markup=False)
 
-   def on_mount(self) -> None:
-      self.set_interval(0.2, self._update_logs)
-
    def watch_selected_process(self, value: str | None) -> None:
       self._rebuild_logs()
 
-   def toggle_pinned(self, process_name: str, is_selected: bool) -> None:
-      if is_selected:
+   def set_pinned(self, process_name: str, pinned: bool) -> None:
+      if pinned:
          self._pinned_processes.add(process_name)
       else:
          self._pinned_processes.discard(process_name)
@@ -47,95 +52,83 @@ class ProcessLogs(Widget):
    def get_all_log_sources(self) -> set[str]:
       return self._pinned_processes | ({self.selected_process} if self.selected_process else set())
 
+   def add_log_line(self, process_name: str, text: str) -> None:
+      if process_name in self.get_all_log_sources():
+         self._write_log(process_name, text)
+
    def _rebuild_logs(self) -> None:
+      log_sources = self.get_all_log_sources()
+
+      self.query_one("#log-header", Static).update(", ".join(sorted(log_sources)))
+
       log_view = self.query_one("#log-view", RichLog)
-
       log_view.clear()
-      log_sources = self.get_all_log_sources()
-
-      self._logged_lines = {name: 0 for name in log_sources}
-
-      header_text = ", ".join(sorted(log_sources))
-
-      self.query_one("#log-header", Static).update(header_text)
-
-      self._update_logs()
-
-   def _update_logs(self) -> None:
-      log_sources = self.get_all_log_sources()
 
       if not log_sources:
          return
 
-      all_new_logs: list[tuple[float, str, str]] = []
-
-      # We can't use type hints for app here easily without circular imports or TYPE_CHECKING
-      # but we know it's MerApp.
-      process_manager = self.app.process_manager
+      all_logs = []
 
       for name in log_sources:
-         process = process_manager.processes[name]
-         last_index = self._logged_lines.get(name, 0)
-         new_entries = process.logs[last_index:]
+         for ts, line in ProcessManager().processes[name].logs:
+            all_logs.append((ts, name, line))
 
-         for ts, line in new_entries:
-            all_new_logs.append((ts, name, line))
+      all_logs.sort(key=lambda x: x[0])
 
-         self._logged_lines[name] = len(process.logs)
+      for _, name, line in all_logs:
+         self._write_log(name, line)
 
-      if not all_new_logs:
-         return
-
-      all_new_logs.sort(key=lambda x: x[0])
-
+   def _write_log(self, process_name: str, line: str) -> None:
       log_view = self.query_one("#log-view", RichLog)
-
-      for _, name, line in all_new_logs:
-         text = Text()
-         color = get_unique_color(name)
-         text.append(f'{name} | ', style=color)
-         text.append(line)
-         log_view.write(text)
+      text = Text()
+      color = get_unique_color(process_name)
+      text.append(f'{process_name} | ', style=color)
+      text.append(line)
+      log_view.write(text)
 
 class ProcessItem(ListItem):
-   def __init__(self, process: Process) -> None:
-      super().__init__()
-      self._process = process
-      self._pinned = False
+   logs_pinned = reactive[bool](False)
+   process_running = reactive[bool](False)
+
+   def __init__(self, process_name: str, **kwargs) -> None:
+      super().__init__(**kwargs)
+
+      self._process_name = process_name
+
+   @property
+   def process_name(self):
+      return self._process_name
 
    def compose(self) -> ComposeResult:
       yield Label(self._label())
 
-   def refresh_label(self) -> None:
-      self.query_one(Label).update(self._label())
+   def watch_logs_pinned(self, value: bool) -> None:
+      self._refresh_label()
 
-   @property
-   def pinned(self) -> bool:
-      return self._pinned
+   def watch_process_running(self, value: bool) -> None:
+      self._refresh_label()
 
-   @pinned.setter
-   def pinned(self, value: bool) -> None:
-      self._pinned = value
-
-   @property
-   def process(self):
-      return self._process
+   def _refresh_label(self) -> None:
+      try:
+         self.query_one(Label).update(self._label())
+      except NoMatches:
+         pass
 
    def _label(self) -> Text:
       text = Text()
 
-      if self._pinned:
-         text.append("✓ ", style="bold green")
+      if self.logs_pinned:
+         text.append("» ")
       else:
          text.append("  ")
 
-      if self._process.is_running:
-         color = get_unique_color(self._process.name)
-         text.append("● ", style=f"bold {color}")
+      if self.process_running:
+         color = get_unique_color(self._process_name)
+         text.append("■ ", style=f"bold {color}")
       else:
-         text.append("○ ", style="dim")
+         text.append("- ", style="dim")
 
-      text.append(self._process.name)
+      text.append(self._process_name)
 
       return text
 
@@ -145,27 +138,17 @@ class ProcessListView(ListView):
    ]
 
    async def action_select_cursor(self) -> None:
-      highlighted = self.highlighted_child
-
-      if isinstance(highlighted, ProcessItem):
-         app: MerApp = self.app
-
-         await app.process_manager.toggle(highlighted.process.name)
-
-         for item in self.query(ProcessItem):
-            item.refresh_label()
+      await ProcessManager().toggle(self.highlighted_child.process_name)
 
    def action_toggle_pinned(self) -> None:
       highlighted = self.highlighted_child
 
-      if isinstance(highlighted, ProcessItem):
-         highlighted.pinned = not highlighted.pinned
-         highlighted.refresh_label()
-         app: MerApp = self.app
-         app.toggle_pinned(highlighted.process.name, highlighted.pinned)
+      highlighted.logs_pinned = not highlighted.logs_pinned
+
+      self.post_message(SetPinnedLogs(highlighted.process_name, highlighted.logs_pinned))
 
 class MerApp(App):
-   TITLE = "MerApp"
+   TITLE = "Mer"
 
    CSS = """
    ProcessLogs {
@@ -210,31 +193,33 @@ class MerApp(App):
    def __init__(self) -> None:
       super().__init__()
 
-      self._process_manager = ProcessManager(load_yml())
-
-   @property
-   def process_manager(self):
-      return self._process_manager
-
    def compose(self) -> ComposeResult:
       yield Header()
 
       with Horizontal():
          yield ProcessListView(
-            *[ProcessItem(p) for p in self._process_manager.processes.values()],
+            *[ProcessItem(name, id=f"process-item-{name}") for name, p in ProcessManager().processes.items()],
             id="sidebar",
          )
-
          with Vertical():
-            yield ProcessLogs()
+            yield ProcessLogs(id='process-logs')
 
       yield Footer()
+
+   def on_mount(self) -> None:
+      def on_log(name, ts, text):
+         self.query_one(ProcessLogs).add_log_line(name, text)
+
+      def on_state_change(name, process_running):
+         self.query_one(f"#process-item-{name}", ProcessItem).process_running = process_running
+
+      ProcessManager().set_callbacks(on_log, on_state_change)
 
    def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
       if not isinstance(event.item, ProcessItem):
          return
 
-      self.query_one(ProcessLogs).selected_process = event.item.process.name
+      self.query_one(ProcessLogs).selected_process = event.item._process_name
 
-   def toggle_pinned(self, process_name: str, is_selected: bool) -> None:
-      self.query_one(ProcessLogs).toggle_pinned(process_name, is_selected)
+   def on_set_pinned_logs(self, message: SetPinnedLogs) -> None:
+      self.query_one(ProcessLogs).set_pinned(message.name, message.pinned)
