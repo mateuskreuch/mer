@@ -7,23 +7,16 @@ from textual.widget import Widget
 from textual.widgets import (
    Footer,
    Header,
-   Input,
    Label,
    ListItem,
    ListView,
    RichLog,
    Static,
-   TabbedContent,
-   TabPane,
 )
 
+from color import get_unique_color
 from process import Process
 from process_manager import ProcessManager, load_yml
-
-COLORS = ["cyan", "green", "yellow", "magenta", "blue", "bright_cyan", "bright_green"]
-
-def get_process_color(name: str):
-   return COLORS[hash(name) % len(COLORS)]
 
 class ProcessLogs(Widget):
    selected_process = reactive[str | None](None)
@@ -99,7 +92,7 @@ class ProcessLogs(Widget):
 
       for _, name, line in all_new_logs:
          text = Text()
-         color = get_process_color(name)
+         color = get_unique_color(name)
          text.append(f'{name} | ', style=color)
          text.append(line)
          log_view.write(text)
@@ -137,7 +130,7 @@ class ProcessItem(ListItem):
          text.append("  ")
 
       if self._process.is_running:
-         color = get_process_color(self._process.name)
+         color = get_unique_color(self._process.name)
          text.append("● ", style=f"bold {color}")
       else:
          text.append("○ ", style="dim")
