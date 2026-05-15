@@ -36,6 +36,10 @@ class Process:
       return self._name
 
    @property
+   def cwd(self):
+      return self._cwd
+
+   @property
    def needs(self):
       return self._needs
 

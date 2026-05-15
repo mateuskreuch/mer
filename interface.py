@@ -8,6 +8,7 @@ from textual.widget import Widget
 from textual.widgets import (
    Footer,
    Header,
+   Input,
    Label,
    ListItem,
    ListView,
@@ -15,9 +16,41 @@ from textual.widgets import (
    Static,
 )
 from textual.message import Message
+from textual.screen import ModalScreen
 
 from color import get_unique_color
+from process import ON_WINDOWS
 from process_manager import ProcessManager
+
+class RunCommandScreen(ModalScreen):
+   def __init__(self, process_name: str, cwd: str, **kwargs):
+      super().__init__(**kwargs)
+
+      self.process_name = process_name
+      self.cwd = cwd
+
+   def compose(self):
+      yield Vertical(
+         Label(f"Run command in [dim]{self.cwd}[/]:"),
+         Input(placeholder="Enter command..."),
+         id="run-command-dialog"
+      )
+
+   def on_mount(self):
+      self.query_one(Input).focus()
+
+   def on_input_submitted(self, event: Input.Submitted):
+      command = event.value
+
+      if command:
+         import subprocess
+
+         if ON_WINDOWS:
+            subprocess.Popen(f'start cmd /k "{command}"', shell=True, cwd=self.cwd)
+         else:
+            self.app.notify("Running commands is not supported on this OS at this time", severity="warning", timeout=3)
+
+      self.dismiss()
 
 class SetPinnedLogs(Message):
    def __init__(self, name: str, pinned: bool):
@@ -135,6 +168,7 @@ class ProcessItem(ListItem):
 class ProcessListView(ListView):
    BINDINGS = [
       Binding("space", "toggle_pinned", "Pin logs"),
+      Binding("r", "run_command", "Run command"),
    ]
 
    async def action_select_cursor(self):
@@ -146,6 +180,16 @@ class ProcessListView(ListView):
       highlighted.logs_pinned = not highlighted.logs_pinned
 
       self.post_message(SetPinnedLogs(highlighted.process_name, highlighted.logs_pinned))
+
+   def action_run_command(self):
+      highlighted = self.highlighted_child
+
+      process = ProcessManager().processes[highlighted.process_name]
+
+      if process.cwd:
+         self.app.push_screen(RunCommandScreen(process.name, process.cwd))
+      else:
+         self.app.notify("No 'cwd' configured for this process", severity="warning", timeout=3)
 
 class MerApp(App):
    TITLE = "Mer"
@@ -168,6 +212,19 @@ class MerApp(App):
    }
    ProcessItem {
       padding: 0 1;
+   }
+   RunCommandScreen {
+      align: center middle;
+   }
+   #run-command-dialog {
+      padding: 1 2;
+      background: $panel;
+      border: thick $primary;
+      width: 70%;
+      height: 9;
+   }
+   #run-command-dialog Label {
+      margin-bottom: 1;
    }
    """
 

@@ -3,6 +3,7 @@ clock:
 
 worker:
   needs: [clock]
+  cwd: D:\GitHub\mer
   run: ping -t localhost
 
 worker2:
