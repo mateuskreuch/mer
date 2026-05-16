@@ -253,7 +253,10 @@ class MerApp(App):
          self.query_one(ProcessLogs).add_log_line(name, text)
 
       def on_state_change(name, process_running):
-         self.query_one(f"#process-item-{name}", ProcessItem).process_running = process_running
+         try:
+            self.query_one(f"#process-item-{name}", ProcessItem).process_running = process_running
+         except NoMatches:
+            pass
 
       ProcessManager().set_callbacks(on_log, on_state_change)
 

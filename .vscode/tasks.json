@@ -4,7 +4,7 @@
       {
          "label": "build",
          "type": "shell",
-         "command": "textual run --dev __main__.py",
+         "command": "textual run --dev mer/__main__.py",
          "presentation": {
             "echo": true,
             "reveal": "always",

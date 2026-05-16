@@ -1,5 +1,5 @@
 
-from .interface import MerApp
+from mer.interface import MerApp
 
 def main():
    MerApp().run()

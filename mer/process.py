@@ -63,43 +63,31 @@ class Process:
       self._on_state_change = on_state_change
 
    async def start(self):
-      try:
-         self._process = await asyncio.create_subprocess_shell(
-               self._run,
-               cwd=self._cwd,
-               stdout=asyncio.subprocess.PIPE,
-               stderr=asyncio.subprocess.STDOUT,
-               shell=True,
-               close_fds=not ON_WINDOWS,
-               **_compat_kwargs()
-         )
-         self.is_running = True
+      self._process = await asyncio.create_subprocess_shell(
+            self._run,
+            cwd=self._cwd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+            shell=True,
+            close_fds=not ON_WINDOWS,
+            **_compat_kwargs()
+      )
+      self.is_running = True
 
-         asyncio.ensure_future(self._stream_output())
-
-      except:
-         pass
+      asyncio.ensure_future(self._stream_output())
 
    if ON_WINDOWS:
       def terminate(self):
-         try:
-            subprocess.call(
-               ['taskkill', '/F', '/T', '/PID', str(self._process.pid)],
-               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+         subprocess.call(
+            ['taskkill', '/F', '/T', '/PID', str(self._process.pid)],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-            self.is_running = False
-
-         except:
-            pass
+         self.is_running = False
    else:
       def terminate(self, sig = signal.SIGTERM):
-         try:
-            os.killpg(self._process.pid, sig)
+         os.killpg(self._process.pid, sig)
 
-            self.is_running = False
-
-         except:
-            pass
+         self.is_running = False
 
    if ON_WINDOWS:
       def kill(self):
