@@ -3,13 +3,21 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mer"
+name = "mer-manager"
 version = "0.1.0"
-description = "A TUI process manager"
+description = "A TUI process manager for developers"
 readme = "README.md"
 requires-python = ">=3.10"
+license = { text = "MIT" }
 authors = [
     { name = "Mateus A. Kreuch" }
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Environment :: Console",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
     "textual>=0.85.2",
