@@ -21,11 +21,12 @@ def _compat_kwargs() -> dict:
    return kwargs
 
 class Process:
-   def __init__(self, name: str, run: str, cwd: str, needs: list[str]):
+   def __init__(self, name: str, run: str, cwd: str, needs: set[str], stop_if_unneeded: bool = False):
       self._name = name
       self._run = run
       self._cwd = cwd
       self._needs = needs
+      self._stop_if_unneeded = stop_if_unneeded
       self._running = False
       self._logs: list[tuple[float, str]] = []
       self._on_log = None
@@ -42,6 +43,10 @@ class Process:
    @property
    def needs(self):
       return self._needs
+
+   @property
+   def stop_if_unneeded(self):
+      return self._stop_if_unneeded
 
    @property
    def is_running(self):

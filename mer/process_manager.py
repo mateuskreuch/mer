@@ -12,7 +12,8 @@ def load_yml(path: str) -> dict[str, Process]:
          name=name,
          run=config["run"],
          cwd=config.get("cwd"),
-         needs=config.get("needs", []),
+         needs=set(config.get("needs", [])),
+         stop_if_unneeded=config.get("stop-if-unneeded", False)
       )
       for name, config in data.items()
    }
@@ -51,6 +52,9 @@ class ProcessManager(metaclass=SingletonMeta):
          await self.start(name)
 
    async def start(self, name: str):
+      if self._processes[name].is_running:
+         return
+
       if name not in self._dependency_order:
          self._dependency_order[name] = self._get_dependency_order(name)
 
@@ -61,7 +65,23 @@ class ProcessManager(metaclass=SingletonMeta):
             await process.start()
 
    def stop(self, name: str):
+      if not self._processes[name].is_running:
+         return
+
       self._processes[name].terminate()
+
+      for other_name in self._processes[name].needs:
+         other = self._processes[other_name]
+
+         if other.stop_if_unneeded and other.is_running and not self.is_needed(other_name):
+            self.stop(other_name)
+
+   def is_needed(self, name: str) -> bool:
+      for other in self._processes.values():
+         if other.is_running and name in other.needs:
+            return True
+
+      return False
 
    def _get_dependency_order(self, name: str) -> list[str]:
       order = []
@@ -69,9 +89,6 @@ class ProcessManager(metaclass=SingletonMeta):
       visited = set()
 
       def dfs(n):
-         if n not in self._processes:
-            raise KeyError(f"Unknown process '{n}'")
-
          if n in visiting:
             raise ValueError(f"Cycle detected involving '{n}'")
 
@@ -81,6 +98,9 @@ class ProcessManager(metaclass=SingletonMeta):
          visiting.add(n)
 
          for dep in self._processes[n].needs:
+            if dep not in self._processes:
+               raise KeyError(f"Process '{n}' needs unknown process '{dep}'")
+
             dfs(dep)
 
          visiting.discard(n)
