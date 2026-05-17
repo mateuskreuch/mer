@@ -1,3 +1,4 @@
+import asyncio
 from rich.text import Text
 from textual.app import App
 from textual.binding import Binding
@@ -171,8 +172,8 @@ class ProcessListView(ListView):
       Binding("r", "run_command", "Run command"),
    ]
 
-   async def action_select_cursor(self):
-      await ProcessManager().toggle(self.highlighted_child.process_name)
+   def action_select_cursor(self):
+      ProcessManager().toggle(self.highlighted_child.process_name)
 
    def action_toggle_pinned(self):
       highlighted = self.highlighted_child

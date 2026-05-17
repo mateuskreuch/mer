@@ -1,3 +1,4 @@
+import asyncio
 import yaml
 from .process import Process
 
@@ -13,7 +14,8 @@ def load_yml(path: str) -> dict[str, Process]:
          run=config["run"],
          cwd=config.get("cwd"),
          needs=set(config.get("needs", [])),
-         stop_if_unneeded=config.get("stop-if-unneeded", False)
+         stop_if_unneeded=config.get("stop-if-unneeded", False),
+         ready_when_log=config.get("ready-when-log")
       )
       for name, config in data.items()
    }
@@ -45,24 +47,14 @@ class ProcessManager(metaclass=SingletonMeta):
    def processes(self):
       return self._processes
 
-   async def toggle(self, name: str):
+   def toggle(self, name: str):
       if self._processes[name].is_running:
          self.stop(name)
       else:
-         await self.start(name)
+         self.start(name)
 
-   async def start(self, name: str):
-      if self._processes[name].is_running:
-         return
-
-      if name not in self._dependency_order:
-         self._dependency_order[name] = self._get_dependency_order(name)
-
-      for n in self._dependency_order[name]:
-         process = self._processes[n]
-
-         if not process.is_running:
-            await process.start()
+   def start(self, name: str):
+      asyncio.create_task(self._start(name))
 
    def stop(self, name: str):
       if not self._processes[name].is_running:
@@ -82,6 +74,19 @@ class ProcessManager(metaclass=SingletonMeta):
             return True
 
       return False
+
+   async def _start(self, name: str):
+      if self._processes[name].is_running:
+         return
+
+      if name not in self._dependency_order:
+         self._dependency_order[name] = self._get_dependency_order(name)
+
+      for n in self._dependency_order[name]:
+         process = self._processes[n]
+
+         if not process.is_running:
+            await process.start()
 
    def _get_dependency_order(self, name: str) -> list[str]:
       order = []

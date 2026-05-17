@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 import signal
 import sys
 import time
@@ -21,16 +22,19 @@ def _compat_kwargs() -> dict:
    return kwargs
 
 class Process:
-   def __init__(self, name: str, run: str, cwd: str, needs: set[str], stop_if_unneeded: bool = False):
+   def __init__(self, name: str, run: str, cwd: str, needs: set[str], stop_if_unneeded: bool = False, ready_when_log: str | None = None):
       self._name = name
       self._run = run
       self._cwd = cwd
       self._needs = needs
       self._stop_if_unneeded = stop_if_unneeded
+      self._ready_when_log = ready_when_log
       self._running = False
       self._logs: list[tuple[float, str]] = []
       self._on_log = None
       self._on_state_change = None
+      self._ready_event = asyncio.Event()
+      self._start_lock = asyncio.Lock()
 
    @property
    def name(self):
@@ -49,6 +53,10 @@ class Process:
       return self._stop_if_unneeded
 
    @property
+   def ready_when_log(self):
+      return self._ready_when_log
+
+   @property
    def is_running(self):
       return self._running
 
@@ -59,6 +67,14 @@ class Process:
       if self._on_state_change:
          self._on_state_change(self._name, value)
 
+      if self.ready_when_log:
+         if not self.is_running:
+            self._ready_event.clear()
+
+      else:
+         if self.is_running:
+            self._ready_event.set()
+
    @property
    def logs(self):
       return self._logs
@@ -67,19 +83,28 @@ class Process:
       self._on_log = on_log
       self._on_state_change = on_state_change
 
-   async def start(self):
-      self._process = await asyncio.create_subprocess_shell(
-            self._run,
-            cwd=self._cwd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-            shell=True,
-            close_fds=not ON_WINDOWS,
-            **_compat_kwargs()
-      )
-      self.is_running = True
+   async def wait_until_ready(self):
+      await self._ready_event.wait()
 
-      asyncio.ensure_future(self._stream_output())
+   async def start(self):
+      async with self._start_lock:
+         if self.is_running:
+            return
+
+         self._process = await asyncio.create_subprocess_shell(
+               self._run,
+               cwd=self._cwd,
+               stdout=asyncio.subprocess.PIPE,
+               stderr=asyncio.subprocess.STDOUT,
+               shell=True,
+               close_fds=not ON_WINDOWS,
+               **_compat_kwargs()
+         )
+         self.is_running = True
+
+         asyncio.ensure_future(self._stream_output())
+
+         await self.wait_until_ready()
 
    if ON_WINDOWS:
       def terminate(self):
@@ -111,6 +136,10 @@ class Process:
 
             ts = time.time_ns()
             text = line.decode(errors="replace").rstrip("\r\n")
+
+            if self._ready_when_log and not self._ready_event.is_set():
+               if re.search(self._ready_when_log, text):
+                  self._ready_event.set()
 
             self._add_log(ts, text)
 
