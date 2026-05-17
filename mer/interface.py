@@ -115,7 +115,7 @@ class ProcessLogs(Widget):
       log_view = self.query_one("#log-view", RichLog)
       text = Text()
       color = get_unique_color(process_name)
-      text.append(f'{process_name} | ', style=color)
+      text.append(f'{process_name}\t| ', style=color)
       text.append(line)
       log_view.write(text)
 
